@@ -20,26 +20,6 @@ Pipeline parameters can be adjusted using the following methods:
 2. In the `nextflow.config` file
 3. In a JSON file via the `-params-file` parameter
 
-It is also possible to pass arguments directly to a pipeline process using the `ext.args` variable in `conf/modules.config` (see example below):
-```
-    withName: 'IVAR_CONSENSUS' {
-        ext.args            = "-n 'N' -k"
-        ext.when            = {  }
-        publishDir = [
-            [
-                path: { "${params.outdir}/${meta.id}/assembly/" },
-                pattern: "none",
-                mode: 'copy'
-            ],
-            [
-                path: { "${params.outdir}/${meta.id}/qc" },
-                pattern: "*.csv",
-                mode: 'copy'
-            ]
-        ]
-    }
-```
-
 # Input Options
 ## `--input`
 Path to the samplesheet. 
@@ -47,244 +27,125 @@ Path to the samplesheet.
 ### Example samplesheet
 `samplesheet.csv`:
 ```csv
-sample,fastq_1,fastq_2
-sample01,sample01_R1_001.fastq.gz,sample01_R2_001.fastq.gz
-sample02,sample02_R1_001.fastq.gz,sample02_R2_001.fastq.gz
+taxon
+Alphainfluenzavirus
 ```
 ### Samplesheet columns
 
-{: .note}
-- Required columns: `sample`, and `fastq_1` + `fastq_2` or `sra` 
-- All file paths in the samplesheet must be absolute.
+|Column Name|Description|
+|:-|:-|
+|`taxon`|Taxonomy name, as it appears in NCBI (if using NCBI)|
+|`segmented`|Whether or not the taxon has a segmented genome (true or false (not case sensitive))|
+|`assembly`|Path to a multi-FASTA file containing sequences associated with the specifed taxon|
+|`metadata`|Path to CSV file containing information about each sequence in the supplied assembly|
+|`exclusions`|Path to CSV file containing sequence accessions that should be excluded|
+
+### Metadata columns
 
 |Column Name|Description|
 |:-|:-|
-|`sample`|Sample name|
-|`fastq_1`|Absolute path to the forward (R1) Illumina read file. Must be supplied with `fastq_2`. Cannot be supplied with `sra` column.|
-|`fastq_2`|Absolute path to the forward (R2) Illumina read file. Must be supplied with `fastq_1`. Cannot be supplied with `sra` column.|
-|`sra`|NCBI SRA accession number. Cannot be used with `fastq_1` or `fastq_2`.|
-|`ref_file`|Semicolon-separated list of reference genome file paths. Reference genomes must be `gz` compressed. |
-|`ref_name`|Semicolon-separated list of references to use based on their name in the reference set. |
-|`ref_taxon`|Semicolon-separated list of references to select from based on the taxonomy listed in the reference set. |
-|`ref_species`|Semicolon-separated list of references to select from based on the species listed in the reference set. |
-|`ref_include`|Semicolon-separated list of reference selection inclusion patterns (e.g., `name=Betacoronavirus-wg-1`). |
-|`ref_exclude`|Semicolon-separated list of reference selection exclusion patterns (e.g., `*`). |
+|`acession`|Sequence accession that matches the sequence header in the multi-FASTA|
+|`taxon`|Taxonomy name|
+|`species`|Species name (optional)|
+|`segment`|Species name (optional)|
 
 {: .note}
-Reference selection criteria supplied in the samplesheet via the `ref_taxon`, `ref_species`, `ref_segment`, `ref_name`, `ref_include`, and `ref_exclude` columns is applied per sample. You can apply these filters to an entire run using the `ref_*` filter config parameters.
+You can add whatever columns you want to the metadata and they will be carried through to the final reference set
 
-{: .tip}
-If a partcular reference is causing you problems you can exclude it using the `ref_exclude` column or parameter - e.g., `--ref_exclude name=Alphainfluenzavirus-4-24`
+### Exclusions
 
-## `--max_reads`
-The maximum number of reads to include in the analysis.
+|Column Name|Description|
+|:-|:-|
+|`acession`|Sequence accession|
 
-- Options: `0...Inf`
-- Default: `2_000_000`
-
-> Samples with more than this number of reads will be randomly down-sampled using `seqtk sample`. Read counts are based on the sum of the forward and reverse reads.
-
-## `--scrub_reads`
-Option to use the SRA Human Read Scrubber tool prior to read processing.
-
-- Options: `true` or `false`
-- Default: `false`
-
-> Samples with more than this number of reads will be randomly down-sampled using `seqtk sample`. Read counts are based on the sum of the forward and reverse reads.
-
-# Metagenomic Analysis
-## `--sm_db`
-Path to Sourmash database to use for metagenomic classification
-
-- Options: Path to database file
-- Default: "${projectDir}/assets/databases/ncbi-viruses-2025.01.dna.k=21.sig.zip"
-
-> Learn more about sourmash databases [here](https://sourmash.readthedocs.io/en/latest/databases-md/).
-
-## `--sm_taxa`
-Path to taxonomic information for the Sourmash database supplied via `--sm_db`.
-
-- Options: Path to taxonomy file
-- Default: "${projectDir}/assets/databases/ncbi-viruses.2025.01.lineages.csv.gz"
-
-> Learn more about sourmash databases [here](https://sourmash.readthedocs.io/en/latest/databases-md/).
-
-# Reference Selection
-## `--ref_set`
-Path to a compressed reference set in JSON lines format (`gz` compressed) or CSV format.
-
-- Options: Path to a `.jsonl.gz` or `.csv`
-- Default: `${projectDir}/assets/reference_sets/EPITOME_*.jsonl.gz`
-
-> Learn more about reference sets [here](overview.html#reference-sets).
-
-## `--ref_file`
-Path(s) to a `gz` compressed reference files. References supplied this way will be used to create assemblies for **all** samples.
-
-- Options: Path to one or more `gz` compressed FASTA file.
-- Default: `null`
-
-> You must use quotes when supplying multiple paths (e.g., `--ref_file "references/*.fa.gz"`), otherwise Nextflow will only recognize the first path as input.
-
-## `--ref_mode`
-Reference selection mode
-
-- Options: `standard`, `sensitive`, and `kitchen-sink`.
-- Default: `standard`
-
-> You can skip reference selection by setting `ref_mode` to `null`. Learn more about reference selection modes [here](overview.html#reference-selection).
-
-## `--ref_genfrac`
-Minimum genome fraction used for reference selection.
+## `--len_threshold`
+The sequence length threshold used to filter input sequences: `length +- len_threshold*mean(length)`
 
 - Options: `0...1`
-- Default: `0.1`
+- Default: `0.20`
 
-> Consensus assemblies will only be generated if the proportion of the reference detected in the sample exceeds this value.  This differs from the genome fraction threshold used for the final quality assessment (`--qc_genfrac`). This value should generally be lower than the QC threshold, to account for gaps in the de novo assembly.
-
-## `--ref_dist`
-Average nucleotide difference used to cluster references during reference selection (`1 - ( % ANI / 100 )`).
-
-- Options: `0...1`
-- Default: `0.2`
-
-> This paramater primarily controls the selection of closely related references due to fragmented de novo assemblies.
-
-## `--ref_denovo_assembler`
-De novo assembler to use for accurate reference selection.
-
-- Options: `spades`, `megahit`, `velvet`, and `skesa`.
-- Default: `megahit`
-
-> Only applies to `standard` and `sensitive` reference selection modes.
-
-## `--ref_denovo_contigcov`
-Minimum depth of coverage for a contig to be retained in the de novo assembly.
-
-- Options: `0...Inf`
-- Default: `10`
-
-> Only applies to `standard` and `sensitive` reference selection modes.
-
-## `--ref_denovo_contiglen`
-Minimum length for a contig to be retained in the de novo assembly.
-
-- Options: `0...Inf`
-- Default: `300`
-
-> Only applies to `standard` and `sensitive` reference selection modes.
-
-## `--ref_denovo_gsize`
-Genome size estimate used by Shovill
-
-- Options: `0...Inf`
-- Default: `1.0M`
-
-> This is primarily used for read downsampling and should generally not need to be adjusted. Only applies to `standard` and `sensitive` reference selection modes.
-
-
-## `--ref_denovo_depth`
-Target assembly depth used by Shovill
-
-- Options: `0...Inf`
-- Default: `30`
-
-> Shovill downsamples reads to this target depth using the the genome size supplied by `ref_denovo_gsize`. Increasing this may lead to greater reference selection sensitivity but with a corresponding decrease in efficiency. Only applies to `standard` and `sensitive` reference selection modes.
-
-
-## `--ref_taxon`
-A semi-colon separated list of taxon in the reference set that should be considered during reference selection
-
-- Options: Taxon name(s) in the reference set
-- Default: `null`
-
-> This filter will be applied for all samples on a run.
-
-## `--ref_species`
-A semi-colon separated list of species in the reference set that should be considered during reference selection
-
-- Options: Species name(s) in the reference set
-- Default: `null`
-
-> This filter will be applied for all samples on a run.
-
-## `--ref_segment`
-A semi-colon separated list of segments in the reference set that should be considered during reference selection
-
-- Options: Segment name(s) in the reference set
-- Default: `null`
-
-> This filter will be applied for all samples on a run.
-
-## `--ref_name`
-A semi-colon separated list of references in the reference set that should be used for genome assembly
-
-- Options: Reference name(s) in the reference set
-- Default: `null`
-
-> These references will be used for all samples on a run.
-
-## `--ref_include`
-A semi-colon separated list of inclusion patterns to be applied to the reference set
-
-- Default: `null`
-- Example: `species=Alphainfluenzavirus;segment=1`
-
-> Inclusion patterns are applied after exclusion patterns.
-
-## `--ref_exclude`
-A semi-colon separated list of exclusion patterns to be applied to the reference set
-
-- Default: `null`
-- Example: `*`
-
-> Exclusion patterns are applied before inclusion patterns.
-
-# Assembly Options
-## `--cons_mode`
-Method used for creating the reference-based assembly.
-
-- Options: `standard`, `strict`, or `mixed`
-- Default: `standard`
-
-## `--cons_allele_qual`
-Minimum allele quality when making the reference-based assembly.
-
-- Options: `0...Inf`
-- Default: `20`
-
-## `--cons_allele_ratio`
-Minimum allele support when making the reference-based assembly.
-
-- Options: `0...1`
-- Default: `0.6`
-
-## `--cons_allele_depth`
-Minimum allele depth when making the reference-based assembly.
-
-- Options: `0...Inf`
-- Default: `10`
-
-## `--cons_condist`
-Average nucleotide difference used to condense duplicate assemblies (`1 - ( % ANI / 100 )`).
+## `--amb_threshold`
+The ratio of ambiguous bases (`N`) allowed in a sequence.
 
 - Options: `0...1`
 - Default: `0.02`
 
-{: .note}
-Use `--cons_condist 0` to return all duplicated assemblies.
+# Subworkflow
 
-# Quality Control
-## `--qc_depth`
-Minimum average depth of coverage used for quality assessment of reference-based assemblies.
+## `--ncbi`
+Automatically pull down sequences from NCBI
 
-- Options: `0...Inf`
-- Default: `30`
+- Options: `true` or `false`
+- Default: `true`
 
-## `--qc_genfrac`
-Minimum genome fraction used for quality assessment of reference-based assemblies.
+## `--create`
+Create a reference set from the input sequences
+
+- Options: `true` or `false`
+- Default: `true`
+
+# Clustering Options
+## `--dist_threshold`
+Create a reference set from the input sequences
 
 - Options: `0...1`
-- Default: `0.8`
+- Default: `0.02`
 
-> This is separate from the minimum genome fraction used for reference selection (i.e., `--ref_genfrac`) and applies only to the final quality assessment step.
+## `--max_cluster`
+Maximum number of sequences to include in hierarchal clustering.
+
+- Options: `0...Inf`
+- Default: `1000`
+
+{: .caution}
+Increasing this value can _significantly_ increase run time and may cause the pipeline to fail.
+
+    ksize                      = 31
+    scaled                     = 100
+    window_size                = 8000
+
+## `--ksize`
+K-mer size used when calculating average nucleotide identity using Sourmash (for clustering and condensing).
+
+- Options: `?...?`
+- Default: `31`
+
+> Options are whatever Sourmash allows 🙈
+
+## `--scaled`
+Scaled value used by Sourmash when calculating average nucleotide identity (for clustering and condensing).
+
+- Options: `0...?`
+- Default: `100`
+
+> Options are whatever Sourmash allows 🙈
+
+## `--window_size`
+Sequence window size to use when determining pairwise distances. 
+
+- Options: `0...Inf`
+- Default: `8000`
+
+# Reference Options
+## `--consensus`
+Create references using consensus mode.
+
+- Options: `true` or `false`
+- Default: `true`
+
+## `--centroid`
+Create references using centroid mode.
+
+- Options: `true` or `false`
+- Default: `true`
+
+## `--max_align`
+Maximum number of sequences to include in an alignment.
+
+- Options: `0...Inf`
+- Default: `1000`
+
+> Sequences are randomly subsampled to this value within each cluster.
+
+{: .caution}
+Increasing this value can _significantly_ increase run time and may cause the pipeline to fail.

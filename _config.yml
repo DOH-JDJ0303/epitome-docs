@@ -1,15 +1,15 @@
-title: V.A.P.E.R. Docs
-description: Documentation for the VAPER pipeline
+title: E.P.I.T.O.M.E. Docs
+description: Documentation for the EPITOME pipeline
 theme: just-the-docs
 
-url: https://github.com/DOH-JDJ0303/vaper-docs
+url: https://github.com/DOH-JDJ0303/epitome-docs
 
-baseurl: "/vaper-docs"
+baseurl: "/epitome-docs"
 
-favicon_ico: "/assets/media/vaper-logo.ico"
+favicon_ico: "/assets/media/epitome-logo.ico"
 
 aux_links:
-  VAPER GitHub: https://github.com/DOH-JDJ0303/vaper
+  VAPER GitHub: https://github.com/DOH-JDJ0303/epitome
 
 callouts:
   note:
